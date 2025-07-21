@@ -1,25 +1,27 @@
 const jwt = require("jsonwebtoken");
 const Adminschema = require("../models/adminschema");
 
-async function isAdmin(req,res,next){
-        if(req.cookies.Admin){
-            jwt.verify(req.cookies.Admin,process.env.SECRET_KEY,async(err,decoded)=>{
-            if(err)
-            {
-            return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/Admin/login";</script>');
-            }
-            else
-            {
-                const check = await Adminschema.findOne({_id:decoded._id});
+async function isAdmin(req, res, next) {
+    const adminCount = await Adminschema.countDocuments();
+    // Allow access if no admins exist (first-time setup)
+    if (adminCount === 0) {
+        console.log('🔧 No admins found: allowing first admin registration.');
+        return next();
+    }
+    if (req.cookies.Admin) {
+        jwt.verify(req.cookies.Admin, process.env.SECRET_KEY, async (err, decoded) => {
+            if (err) {
+                return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/Admin/login";</script>');
+            } else {
+                const check = await Adminschema.findOne({ _id: decoded._id });
                 req.body.name = check.name;
                 req.body.email = check.email;
-                req.id=decoded._id
-                if(check.email)
-                next();
+                req.id = decoded._id;
+                if (check.email) next();
             }
-            });
-    }else{
-    return res.status(400).send('<script> alert("You have to login As a Admin first."); window.location = "/Admin/login";</script>');
+        });
+    } else {
+        return res.status(400).send('<script> alert("You have to login As a Admin first."); window.location = "/Admin/login";</script>');
     }
 }
 

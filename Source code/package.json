@@ -5,7 +5,11 @@
   "scripts": {
     "test": "mocha",
     "start": "nodemon src/app.js -e js,hbs,ejs",
-    "test-report": "mocha test --reporter mochawesome --require mochawesome/register"
+    "test-report": "mocha test --reporter mochawesome --require mochawesome/register",
+    "setup": "node setup.js",
+    "fix-port": "node fix-port.js",
+    "create-test-user": "node create-test-user.js",
+    "test-email": "node email-setup.js"
   },
   "keywords": [],
   "author": "",

@@ -11,11 +11,11 @@ router.get("/",async(req,res)=>{
     res.redirect("/Admin/login");
 })
 
-router.get("/register",[isAdmin],async (req, res) =>{
+router.get("/register", async (req, res) =>{
     res.render("Adminregister.hbs");
   });
 
-router.post("/register",[isAdmin],async (req, res) =>{
+router.post("/register", async (req, res) =>{
 
     const { newname, newemail, password} = req.body;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -129,6 +129,12 @@ async function verifyauth(req , res , next){
  
      const v = await Register.findOne({email:req.body.email});
  
+     // Development mode: Skip verification check
+     if (process.env.NODE_ENV === 'development') {
+         console.log('🔧 Development mode: Skipping email verification check');
+         return next();
+     }
+ 
      if(v.verified===false){
  
          return res.status(400).send('<script>alert("You have not Verified go to email and first verify after that do a login."); window.location ="/login" </script>');
@@ -161,23 +167,20 @@ async function verifyauth(req , res , next){
 }
 
 async function companyverifyauth(req, res, next) {
-
-    // console.log(req.body.Email);
+    // Development mode: Skip verification check
+    if (process.env.NODE_ENV === 'development') {
+        console.log('🔧 Development mode: Skipping company email verification check');
+        return next();
+    }
 
     const v = await Companyregister.findOne({ email: req.body.email });
 
     if (v.verified === false) {
-
         return res.status(400).send('<script>alert("You have not Verified go to email and first verify after that do a login."); window.location ="/companylogin" </script>');
-
     }
-
     else{
-
         next();
-
     }
-
 }
 
 async function companyregisterauth(req, res, next) {
@@ -233,17 +236,18 @@ async function companyloggedinonly(req, res, next) {
 }
 
 async function Adminpermission(req,res,next){
+    // Development mode: Skip admin permission check
+    if (process.env.NODE_ENV === 'development') {
+        console.log('🔧 Development mode: Skipping admin permission check');
+        return next();
+    }
 
     const check = await Companyregister.findOne({email:req.body.email});
 
     if(check.permission === true){
-
         next();
-
     }else{
-
-    return res.status(400).send('<script>alert("wait some time after verification complete you got a mail after you are able to login."); window.location = "/companylogin";</script>');
-
+        return res.status(400).send('<script>alert("wait some time after verification complete you got a mail after you are able to login."); window.location = "/companylogin";</script>');
     }
 }
 

@@ -13,7 +13,7 @@ const jwt = require("jsonwebtoken");
 conectMongodb(process.env.DATABASE_URL).then(() => {
     console.log(`Connection Successfully....`)
 }).catch((e) => {
-    x
+    console.error("Database connection failed:", e);
     console.log(`No Connection`)
 })
 
@@ -34,6 +34,50 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true}))
 
 const port = process.env.PORT || 3000;
+
+// Function to find an available port
+const findAvailablePort = async (startPort) => {
+    const net = require('net');
+    
+    return new Promise((resolve, reject) => {
+        const server = net.createServer();
+        
+        server.listen(startPort, () => {
+            const { port } = server.address();
+            server.close(() => resolve(port));
+        });
+        
+        server.on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                // Try the next port
+                findAvailablePort(startPort + 1).then(resolve).catch(reject);
+            } else {
+                reject(err);
+            }
+        });
+    });
+};
+
+// Start server with port finding
+const startServer = async () => {
+    try {
+        const availablePort = await findAvailablePort(port);
+        
+        app.listen(availablePort, () => {
+            console.log(`🚀 Server is running on port ${availablePort}`);
+            console.log(`🌐 Application URL: http://localhost:${availablePort}`);
+            console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+            
+            if (availablePort !== port) {
+                console.log(`⚠️  Note: Port ${port} was busy, using port ${availablePort} instead`);
+            }
+        });
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
+};
+
 app.set("view engine", "hbs")
 
 const static_path = path.join(__dirname, "../public")
@@ -111,15 +155,24 @@ async function main(){
     const op = await Adminschema.find();
 
     if(op.length === 0){
-        const HashPassword = await bcrypt.hash(process.env.Adminpass, 10);
-        const data = {
-            email:process.env.Adminuser,
-            name:"Dipak",
-            password:HashPassword,
-            token:"xyz",
+        const adminUser = process.env.Adminuser;
+        const adminPass = process.env.Adminpass;
+        if (!adminUser || !adminPass) {
+            console.error("Adminuser or Adminpass is not set in .env file. Skipping admin creation.");
+            return;
         }
-        await Adminschema.insertMany([data]);
-    
+        try {
+            const HashPassword = await bcrypt.hash(adminPass, 10); 
+            const data = {
+                email: adminUser,
+                name: "Dipak",
+                password: HashPassword,
+                token: "xyz",
+            }
+            await Adminschema.insertMany([data]);
+        } catch (err) {
+            console.error("Error hashing admin password:", err);
+        }
     }
 
 };
@@ -127,9 +180,14 @@ async function main(){
 main();
 
 
+// --- Serve static files from Frontend directory ---
+const frontend_path = path.join(__dirname, '../../Frontend');
+app.use(express.static(frontend_path));
+
+// Serve Frontend/index.html for the root route
 app.get("/", (req, res) => {
-    res.render("landingpage.hbs")
-})
+    res.sendFile(path.join(frontend_path, "index.html"));
+});
 
 app.get("/logout", async(req, res) => {
     try {
@@ -178,75 +236,96 @@ app.get("/companyabout",[companyloggedinonly],(req,res)=>{
 
 });
 
-app.get("/about", (req, res) => {
-    if(req.cookies.jwt){
-        jwt.verify(req.cookies.jwt,'ehewlkjjfsafasjflkasfjjkfsjflkasjffjsjasfasffafa',async(err,decoded)=>{
-            if(err)
-            {
-            return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/login";</script>');
-            }
-            else
-            {
-                const check = await Register.findOne({_id:decoded._id});
-                const profile = check.profile;
-                const name = check.name;
-                res.render("about.hbs",{profile,name,logged:true})
-            }
-            });
-        
-    }
-    else{
-
-        res.render("about.hbs");
-
-    }
-})
-
-app.get("/blog", (req, res) => {
-    if(req.cookies.jwt){
-        jwt.verify(req.cookies.jwt,'ehewlkjjfsafasjflkasfjjkfsjflkasjffjsjasfasffafa',async(err,decoded)=>{
-            if(err)
-            {
-            return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/login";</script>');
-            }
-            else
-            {
-                const check = await Register.findOne({_id:decoded._id});
-                const profile = check.profile;
-                const name = check.name;
-                res.render("blog.hbs",{profile,name,logged:true})
-            }
-            });
-        
-    }
-    else{
-
-        res.render("blog.hbs");
-
-    }
-})
-app.get("/recommendations", (req, res) => {    if(req.cookies.jwt){
-    jwt.verify(req.cookies.jwt,'ehewlkjjfsafasjflkasfjjkfsjflkasjffjsjasfasffafa',async(err,decoded)=>{
-        if(err)
-        {
-        return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/login";</script>');
+app.get("/about", async (req, res) => {
+    try {
+        if(req.cookies.jwt){
+            jwt.verify(req.cookies.jwt,process.env.SECRET_KEY,async(err,decoded)=>{
+                if(err)
+                {
+                return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/login";</script>');
+                }
+                else
+                {
+                    const check = await Register.findOne({_id:decoded._id});
+                    if (!check) {
+                        return res.status(400).send('<script>alert("User not found."); window.location = "/login";</script>');
+                    }
+                    const profile = check.profile;
+                    const name = check.name;
+                    res.render("about.hbs",{profile,name,logged:true})
+                }
+                });
+            
         }
-        else
-        {
-            const check = await Register.findOne({_id:decoded._id});
-            const profile = check.profile;
-            const name = check.name;
-            res.render("recommendation.hbs",{profile,name,logged:true})
+        else{
+            res.render("about.hbs");
         }
-        });
-    
-}
-else{
-
-    res.render("recommendation.hbs");
-
-}
+    } catch (error) {
+        console.error("Error in /about route:", error);
+        res.status(500).send('<script>alert("Internal server error."); window.location = "/";</script>');
+    }
 })
+
+app.get("/blog", async (req, res) => {
+    try {
+        if(req.cookies.jwt){
+            jwt.verify(req.cookies.jwt,process.env.SECRET_KEY,async(err,decoded)=>{
+                if(err)
+                {
+                return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/login";</script>');
+                }
+                else
+                {
+                    const check = await Register.findOne({_id:decoded._id});
+                    if (!check) {
+                        return res.status(400).send('<script>alert("User not found."); window.location = "/login";</script>');
+                    }
+                    const profile = check.profile;
+                    const name = check.name;
+                    res.render("blog.hbs",{profile,name,logged:true})
+                }
+                });
+            
+        }
+        else{
+            res.render("blog.hbs");
+        }
+    } catch (error) {
+        console.error("Error in /blog route:", error);
+        res.status(500).send('<script>alert("Internal server error."); window.location = "/";</script>');
+    }
+})
+
+app.get("/recommendations", async (req, res) => {
+    try {
+        if(req.cookies.jwt){
+            jwt.verify(req.cookies.jwt,process.env.SECRET_KEY,async(err,decoded)=>{
+                if(err)
+                {
+                return res.status(400).send('<script>alert("Cookies decoding Error."); window.location = "/login";</script>');
+                }
+                else
+                {
+                    const check = await Register.findOne({_id:decoded._id});
+                    if (!check) {
+                        return res.status(400).send('<script>alert("User not found."); window.location = "/login";</script>');
+                    }
+                    const profile = check.profile;
+                    const name = check.name;
+                    res.render("recommendation.hbs",{profile,name,logged:true})
+                }
+                });
+            
+        }
+        else{
+            res.render("recommendation.hbs");
+        }
+    } catch (error) {
+        console.error("Error in /recommendations route:", error);
+        res.status(500).send('<script>alert("Internal server error."); window.location = "/";</script>');
+    }
+})
+
 // app.post('/newpost', async (req, res) => {
 //     try {
 //         const lastJob = await Jobpost.findOne().sort('-job_id');
@@ -318,9 +397,23 @@ else{
 
 
 app.get("*", (req, res) => {
-    res.send("Error 404 Invalid Endpoint");
+    res.status(404).send("Error 404: Invalid Endpoint");
 })
-app.listen(port, () => {
-    console.log(`Server is running in port no ${port}`);
-})
+
+app.use((err, req, res, next) => {
+    console.error("Global error handler:", err);
+    res.status(500).send("Internal Server Error");
+});
+
+startServer();
+
+// Test route for login redirect
+app.get("/test-login", (req, res) => {
+    res.send(`
+        <h1>Login Test Page</h1>
+        <p>If you can see this, the server is running correctly.</p>
+        <p><a href="/login">Go to Login</a></p>
+        <p><a href="/home">Go to Home</a></p>
+    `);
+});
 
